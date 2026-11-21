@@ -1,0 +1,35 @@
+name: Build mod
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.1'
+          cache-disabled: true
+      - name: Build
+        run: |
+          for i in 1 2 3; do
+            gradle build --no-daemon --refresh-dependencies --console=plain 2>&1 | tee build.log
+            if [ ${PIPESTATUS[0]} -eq 0 ]; then exit 0; fi
+            echo "Percobaan $i gagal, tunggu 60 detik lalu coba lagi"
+            sleep 60
+          done
+          exit 1
+      - name: Ringkasan error
+        if: failure()
+        run: |
+          grep -n -A3 "error:" build.log | head -120 || true
+          grep -n -A12 "What went wrong" build.log | head -40 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: txadmin-client
+          path: build/libs/txadmin-client-*.jar
